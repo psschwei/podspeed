@@ -8,6 +8,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/markusthoemmes/podspeed/pkg/pod"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -42,60 +44,62 @@ func main() {
 		log.Fatal("Failed to setup watch for pods", err)
 	}
 
-	stats := &podTimes{}
-	eventCh := make(chan podEvent, 10)
+	stats := &pod.Stats{}
+	eventCh := make(chan pod.Event, 10)
 	go func() {
 		for event := range watcher.ResultChan() {
 			now := time.Now()
 			switch event.Type {
 			case watch.Added:
-				stats.created = now
-				eventCh <- podEvent{name: "created", time: now}
+				p := event.Object.(*corev1.Pod)
+				stats.Created = now
+				eventCh <- pod.Event{Name: p.Name, Time: now, Type: pod.Created}
 			case watch.Modified:
-				pod := event.Object.(*corev1.Pod)
-				if isPodCondTrue(pod, corev1.PodScheduled) && stats.scheduled.IsZero() {
-					stats.scheduled = now
-					eventCh <- podEvent{name: "scheduled", time: now}
+				p := event.Object.(*corev1.Pod)
+				if isPodCondTrue(p, corev1.PodScheduled) && stats.Scheduled.IsZero() {
+					stats.Scheduled = now
+					eventCh <- pod.Event{Name: p.Name, Time: now, Type: pod.Scheduled}
 				}
-				if isPodCondTrue(pod, corev1.PodInitialized) && stats.initialized.IsZero() {
-					stats.initialized = now
-					eventCh <- podEvent{name: "initialized", time: now}
+				if isPodCondTrue(p, corev1.PodInitialized) && stats.Initialized.IsZero() {
+					stats.Initialized = now
+					eventCh <- pod.Event{Name: p.Name, Time: now, Type: pod.Initialized}
 				}
-				if isPodCondTrue(pod, corev1.ContainersReady) && stats.containersReady.IsZero() {
-					stats.containersReady = now
-					eventCh <- podEvent{name: "containerready", time: now}
+				if isPodCondTrue(p, corev1.ContainersReady) && stats.ContainersReady.IsZero() {
+					stats.ContainersReady = now
+					eventCh <- pod.Event{Name: p.Name, Time: now, Type: pod.ContainersReady}
 				}
-				if isPodCondTrue(pod, corev1.PodReady) && stats.ready.IsZero() {
-					stats.ready = now
-					eventCh <- podEvent{name: "ready", time: now}
+				if isPodCondTrue(p, corev1.PodReady) && stats.Ready.IsZero() {
+					stats.Ready = now
+					eventCh <- pod.Event{Name: p.Name, Time: now, Type: pod.Ready}
 				}
 			case watch.Deleted:
-				eventCh <- podEvent{name: "deleted", time: now}
+				p := event.Object.(*corev1.Pod)
+				eventCh <- pod.Event{Name: p.Name, Time: now, Type: pod.Deleted}
 				close(eventCh)
 			}
 		}
 	}()
 
-	pod := basicPod("default", "test")
-	if _, err := kube.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{}); err != nil {
+	p := basicPod("default", "basic-"+uuid.NewString())
+	if _, err := kube.CoreV1().Pods(p.Namespace).Create(ctx, p, metav1.CreateOptions{}); err != nil {
 		log.Fatal("Failed to create pod", err)
 	}
 
 	for event := range eventCh {
-		log.Println(event.name, event.time)
-		if event.name == "ready" {
+		log.Println(event.Name, event.Type, event.Time)
+		if event.Type == pod.Ready {
 			break
 		}
 	}
-	log.Println("Until Scheduled took", stats.scheduled.Sub(stats.created))
-	log.Println("Until Initialized took", stats.initialized.Sub(stats.created))
-	log.Println("Until Ready took", stats.ready.Sub(stats.created))
+	log.Println("Until Scheduled took", stats.TimeToScheduled())
+	log.Println("Until Initialized took", stats.TimeToInitialized())
+	log.Println("Until Ready took", stats.TimeToReady())
 
-	if err := kube.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}); err != nil {
+	if err := kube.CoreV1().Pods(p.Namespace).Delete(ctx, p.Name, metav1.DeleteOptions{}); err != nil {
 		log.Fatal("Failed to delete pod", err)
 	}
 	for event := range eventCh {
-		log.Println(event.name, event.time)
+		log.Println(event.Name, event.Type, event.Time)
 	}
 }
 
@@ -115,19 +119,6 @@ func basicPod(ns, name string) *corev1.Pod {
 			}},
 		},
 	}
-}
-
-type podTimes struct {
-	created         time.Time
-	scheduled       time.Time
-	initialized     time.Time
-	containersReady time.Time
-	ready           time.Time
-}
-
-type podEvent struct {
-	name string
-	time time.Time
 }
 
 func isPodCondTrue(p *corev1.Pod, condType corev1.PodConditionType) bool {
