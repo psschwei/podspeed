@@ -104,26 +104,26 @@ func main() {
 		if _, err := kube.CoreV1().Pods(p.Namespace).Create(ctx, p, metav1.CreateOptions{}); err != nil {
 			log.Fatal("Failed to create pod", err)
 		}
-	}
 
-	// Wait for all pods to become ready.
-	if err := waitForEventN(ctx, eventCh, pod.Ready, podN); err != nil {
-		log.Fatal("Failed to wait for pod becoming ready", err)
+		// Wait for all pods to become ready.
+		if err := waitForEventN(ctx, eventCh, pod.Ready, 1); err != nil {
+			log.Fatal("Failed to wait for pod becoming ready", err)
+		}
+
+		var zero int64
+		if err := kube.CoreV1().Pods(p.Namespace).Delete(ctx, p.Name, metav1.DeleteOptions{
+			GracePeriodSeconds: &zero,
+		}); err != nil {
+			log.Fatal("Failed to delete pod", err)
+		}
+
+		waitForEventN(ctx, eventCh, pod.Deleted, 1)
 	}
 
 	for _, stat := range stats {
 		log.Printf("Timings: Scheduled: %v, Initialized %v, Ready: %v\n",
 			stat.TimeToScheduled(), stat.TimeToInitialized(), stat.TimeToReady())
 	}
-
-	for _, p := range pods {
-		if err := kube.CoreV1().Pods(p.Namespace).Delete(ctx, p.Name, metav1.DeleteOptions{}); err != nil {
-			log.Fatal("Failed to delete pod", err)
-		}
-	}
-
-	// Wait for all pods to have been deleted.
-	waitForEventN(ctx, eventCh, pod.Deleted, podN)
 }
 
 func waitForEventN(ctx context.Context, eventCh chan pod.Event, eventType pod.EventType, podN int) error {
