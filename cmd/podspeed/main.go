@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"os"
 	"os/signal"
@@ -19,6 +20,18 @@ import (
 )
 
 func main() {
+	var (
+		ns   string
+		podN int
+	)
+	flag.StringVar(&ns, "n", "default", "the namespace to create the pods in")
+	flag.IntVar(&podN, "pods", 1, "the amount of pods to create")
+	flag.Parse()
+
+	if podN < 1 {
+		log.Fatal("-pods must not be smaller than 1")
+	}
+
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
@@ -35,14 +48,22 @@ func main() {
 		log.Fatal("Failed to create Kubernetes client", err)
 	}
 
-	watcher, err := kube.CoreV1().Pods("default").Watch(ctx, metav1.ListOptions{
+	watcher, err := kube.CoreV1().Pods(ns).Watch(ctx, metav1.ListOptions{
 		LabelSelector: labels.Set{"podspeed/type": "basic"}.String(),
 	})
 	if err != nil {
 		log.Fatal("Failed to setup watch for pods", err)
 	}
 
-	stats := &pod.Stats{}
+	pods := make([]*corev1.Pod, 0, podN)
+	stats := make(map[string]*pod.Stats, podN)
+
+	for i := 0; i < podN; i++ {
+		p := pod.Basic(ns, "basic-"+uuid.NewString())
+		pods = append(pods, p)
+		stats[p.Name] = &pod.Stats{}
+	}
+
 	eventCh := make(chan pod.Event, 10)
 	go func() {
 		for event := range watcher.ResultChan() {
@@ -50,10 +71,12 @@ func main() {
 			switch event.Type {
 			case watch.Added:
 				p := event.Object.(*corev1.Pod)
+				stats := stats[p.Name]
 				stats.Created = now
 				eventCh <- pod.Event{Name: p.Name, Time: now, Type: pod.Created}
 			case watch.Modified:
 				p := event.Object.(*corev1.Pod)
+				stats := stats[p.Name]
 				if pod.IsConditionTrue(p, corev1.PodScheduled) && stats.Scheduled.IsZero() {
 					stats.Scheduled = now
 					eventCh <- pod.Event{Name: p.Name, Time: now, Type: pod.Scheduled}
@@ -73,46 +96,46 @@ func main() {
 			case watch.Deleted:
 				p := event.Object.(*corev1.Pod)
 				eventCh <- pod.Event{Name: p.Name, Time: now, Type: pod.Deleted}
-				close(eventCh)
 			}
 		}
 	}()
 
-	p := pod.Basic("default", "basic-"+uuid.NewString())
-	if _, err := kube.CoreV1().Pods(p.Namespace).Create(ctx, p, metav1.CreateOptions{}); err != nil {
-		log.Fatal("Failed to create pod", err)
+	for _, p := range pods {
+		if _, err := kube.CoreV1().Pods(p.Namespace).Create(ctx, p, metav1.CreateOptions{}); err != nil {
+			log.Fatal("Failed to create pod", err)
+		}
 	}
 
-	if err := waitForReady(ctx, eventCh); err != nil {
+	// Wait for all pods to become ready.
+	if err := waitForEventN(ctx, eventCh, pod.Ready, podN); err != nil {
 		log.Fatal("Failed to wait for pod becoming ready", err)
 	}
 
-	log.Printf("Timings: Scheduled: %v, Initialized %v, Ready: %v\n",
-		stats.TimeToScheduled(), stats.TimeToInitialized(), stats.TimeToReady())
-
-	if err := kube.CoreV1().Pods(p.Namespace).Delete(ctx, p.Name, metav1.DeleteOptions{}); err != nil {
-		log.Fatal("Failed to delete pod", err)
+	for _, stat := range stats {
+		log.Printf("Timings: Scheduled: %v, Initialized %v, Ready: %v\n",
+			stat.TimeToScheduled(), stat.TimeToInitialized(), stat.TimeToReady())
 	}
 
-	// The channel will be closed the pod is gone.
-	for {
-		select {
-		case _, ok := <-eventCh:
-			if !ok {
-				return
-			}
-		case <-ctx.Done():
-			return
+	for _, p := range pods {
+		if err := kube.CoreV1().Pods(p.Namespace).Delete(ctx, p.Name, metav1.DeleteOptions{}); err != nil {
+			log.Fatal("Failed to delete pod", err)
 		}
 	}
+
+	// Wait for all pods to have been deleted.
+	waitForEventN(ctx, eventCh, pod.Deleted, podN)
 }
 
-func waitForReady(ctx context.Context, eventCh chan pod.Event) error {
+func waitForEventN(ctx context.Context, eventCh chan pod.Event, eventType pod.EventType, podN int) error {
+	var seen int
 	for {
 		select {
 		case event := <-eventCh:
-			if event.Type == pod.Ready {
-				return nil
+			if event.Type == eventType {
+				seen++
+				if seen == podN {
+					return nil
+				}
 			}
 		case <-ctx.Done():
 			return ctx.Err()
