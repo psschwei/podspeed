@@ -86,20 +86,21 @@ func main() {
 	}
 
 	for event := range eventCh {
-		log.Println(event.Name, event.Type, event.Time)
+		// Wait for the pod to become ready before we delete it.
 		if event.Type == pod.Ready {
 			break
 		}
 	}
-	log.Println("Until Scheduled took", stats.TimeToScheduled())
-	log.Println("Until Initialized took", stats.TimeToInitialized())
-	log.Println("Until Ready took", stats.TimeToReady())
+
+	log.Printf("Timings: Scheduled: %v, Initialized %v, Ready: %v\n",
+		stats.TimeToScheduled(), stats.TimeToInitialized(), stats.TimeToReady())
 
 	if err := kube.CoreV1().Pods(p.Namespace).Delete(ctx, p.Name, metav1.DeleteOptions{}); err != nil {
 		log.Fatal("Failed to delete pod", err)
 	}
-	for event := range eventCh {
-		log.Println(event.Name, event.Type, event.Time)
+
+	// The channel will be closed the pod is gone.
+	for range eventCh {
 	}
 }
 
