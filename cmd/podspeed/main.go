@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/markusthoemmes/podspeed/pkg/pod"
+	statistics "github.com/montanaflynn/stats"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -64,7 +66,8 @@ func main() {
 		stats[p.Name] = &pod.Stats{}
 	}
 
-	eventCh := make(chan pod.Event, 10)
+	readyCh := make(chan struct{}, podN)
+	deletedCh := make(chan struct{}, podN)
 	go func() {
 		for event := range watcher.ResultChan() {
 			now := time.Now()
@@ -73,29 +76,24 @@ func main() {
 				p := event.Object.(*corev1.Pod)
 				stats := stats[p.Name]
 				stats.Created = now
-				eventCh <- pod.Event{Name: p.Name, Time: now, Type: pod.Created}
 			case watch.Modified:
 				p := event.Object.(*corev1.Pod)
 				stats := stats[p.Name]
 				if pod.IsConditionTrue(p, corev1.PodScheduled) && stats.Scheduled.IsZero() {
 					stats.Scheduled = now
-					eventCh <- pod.Event{Name: p.Name, Time: now, Type: pod.Scheduled}
 				}
 				if pod.IsConditionTrue(p, corev1.PodInitialized) && stats.Initialized.IsZero() {
 					stats.Initialized = now
-					eventCh <- pod.Event{Name: p.Name, Time: now, Type: pod.Initialized}
 				}
 				if pod.IsConditionTrue(p, corev1.ContainersReady) && stats.ContainersReady.IsZero() {
 					stats.ContainersReady = now
-					eventCh <- pod.Event{Name: p.Name, Time: now, Type: pod.ContainersReady}
 				}
 				if pod.IsConditionTrue(p, corev1.PodReady) && stats.Ready.IsZero() {
 					stats.Ready = now
-					eventCh <- pod.Event{Name: p.Name, Time: now, Type: pod.Ready}
+					readyCh <- struct{}{}
 				}
 			case watch.Deleted:
-				p := event.Object.(*corev1.Pod)
-				eventCh <- pod.Event{Name: p.Name, Time: now, Type: pod.Deleted}
+				deletedCh <- struct{}{}
 			}
 		}
 	}()
@@ -106,7 +104,7 @@ func main() {
 		}
 
 		// Wait for all pods to become ready.
-		if err := waitForEventN(ctx, eventCh, pod.Ready, 1); err != nil {
+		if err := waitForN(ctx, readyCh, 1); err != nil {
 			log.Fatal("Failed to wait for pod becoming ready", err)
 		}
 
@@ -117,25 +115,31 @@ func main() {
 			log.Fatal("Failed to delete pod", err)
 		}
 
-		waitForEventN(ctx, eventCh, pod.Deleted, 1)
+		waitForN(ctx, deletedCh, 1)
 	}
 
+	timeToReady := make([]float64, 0, len(stats))
 	for _, stat := range stats {
-		log.Printf("Timings: Scheduled: %v, Initialized %v, Ready: %v\n",
-			stat.TimeToScheduled(), stat.TimeToInitialized(), stat.TimeToReady())
+		timeToReady = append(timeToReady, float64(stat.TimeToReady()/time.Millisecond))
 	}
+
+	min, _ := statistics.Min(timeToReady)
+	max, _ := statistics.Max(timeToReady)
+	mean, _ := statistics.Mean(timeToReady)
+	p95, _ := statistics.Percentile(timeToReady, 95)
+	p99, _ := statistics.Percentile(timeToReady, 99)
+	fmt.Printf("Created %d pods sequentially, results are in ms:\n", podN)
+	fmt.Printf("min: %.0f, max: %.0f, mean: %.0f, p95: %.0f, p99: %.0f\n", min, max, mean, p95, p99)
 }
 
-func waitForEventN(ctx context.Context, eventCh chan pod.Event, eventType pod.EventType, podN int) error {
+func waitForN(ctx context.Context, ch chan struct{}, n int) error {
 	var seen int
 	for {
 		select {
-		case event := <-eventCh:
-			if event.Type == eventType {
-				seen++
-				if seen == podN {
-					return nil
-				}
+		case <-ch:
+			seen++
+			if seen == n {
+				return nil
 			}
 		case <-ctx.Done():
 			return ctx.Err()
