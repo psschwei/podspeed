@@ -35,7 +35,6 @@ func main() {
 		log.Fatal("Failed to create Kubernetes client", err)
 	}
 
-	log.Println("Setting up watch")
 	watcher, err := kube.CoreV1().Pods("default").Watch(ctx, metav1.ListOptions{
 		LabelSelector: labels.Set{"podspeed/type": "basic"}.String(),
 	})
@@ -77,12 +76,10 @@ func main() {
 		}
 	}()
 
-	log.Println("Creating pod")
 	pod := basicPod("default", "test")
 	if _, err := kube.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{}); err != nil {
 		log.Fatal("Failed to create pod", err)
 	}
-	log.Println("Pod created successfully")
 
 	for event := range eventCh {
 		log.Println(event.name, event.time)
@@ -90,19 +87,16 @@ func main() {
 			break
 		}
 	}
-	log.Println("Pod is ready")
 	log.Println("Until Scheduled took", stats.scheduled.Sub(stats.created))
 	log.Println("Until Initialized took", stats.initialized.Sub(stats.created))
 	log.Println("Until Ready took", stats.ready.Sub(stats.created))
 
-	log.Println("Deleting pod")
 	if err := kube.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}); err != nil {
 		log.Fatal("Failed to delete pod", err)
 	}
 	for event := range eventCh {
 		log.Println(event.name, event.time)
 	}
-	log.Println("Pod deleted successfully")
 }
 
 func basicPod(ns, name string) *corev1.Pod {
