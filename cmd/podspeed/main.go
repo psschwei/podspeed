@@ -15,7 +15,6 @@ import (
 	statistics "github.com/montanaflynn/stats"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -50,9 +49,7 @@ func main() {
 		log.Fatal("Failed to create Kubernetes client", err)
 	}
 
-	watcher, err := kube.CoreV1().Pods(ns).Watch(ctx, metav1.ListOptions{
-		LabelSelector: labels.Set{"podspeed/type": "basic"}.String(),
-	})
+	watcher, err := kube.CoreV1().Pods(ns).Watch(ctx, metav1.ListOptions{})
 	if err != nil {
 		log.Fatal("Failed to setup watch for pods", err)
 	}
@@ -61,7 +58,7 @@ func main() {
 	stats := make(map[string]*pod.Stats, podN)
 
 	for i := 0; i < podN; i++ {
-		p := pod.Basic(ns, "basic-"+uuid.NewString())
+		p := pod.Knative(ns, "basic-"+uuid.NewString())
 		pods = append(pods, p)
 		stats[p.Name] = &pod.Stats{}
 	}

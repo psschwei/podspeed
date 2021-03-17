@@ -12,9 +12,6 @@ func Basic(ns, name string) *corev1.Pod {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,
 			Name:      name,
-			Labels: map[string]string{
-				"podspeed/type": "basic",
-			},
 		},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{{
