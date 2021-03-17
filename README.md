@@ -16,9 +16,10 @@ $ podspeed -h
     	the namespace to create the pods in (default "default")
   -pods int
     	the amount of pods to create (default 1)
+  -typ string
+    	the type of pods to create, either 'basic' or 'knative' (default "basic")
 ```
 
 ## "Roadmap"
 
 - Parallel creation of pods
-- Different pod types (basic, multiple containers, Knative)

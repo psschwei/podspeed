@@ -23,12 +23,17 @@ import (
 func main() {
 	var (
 		ns   string
+		typ  string
 		podN int
 	)
 	flag.StringVar(&ns, "n", "default", "the namespace to create the pods in")
+	flag.StringVar(&typ, "typ", "basic", "the type of pods to create, either 'basic' or 'knative'")
 	flag.IntVar(&podN, "pods", 1, "the amount of pods to create")
 	flag.Parse()
 
+	if typ != "basic" && typ != "knative" {
+		log.Fatal("-typ must be either 'basic' or 'knative'")
+	}
 	if podN < 1 {
 		log.Fatal("-pods must not be smaller than 1")
 	}
@@ -58,7 +63,12 @@ func main() {
 	stats := make(map[string]*pod.Stats, podN)
 
 	for i := 0; i < podN; i++ {
-		p := pod.Knative(ns, "basic-"+uuid.NewString())
+		var p *corev1.Pod
+		if typ == "knative" {
+			p = pod.Knative(ns, typ+"-"+uuid.NewString())
+		} else {
+			p = pod.Basic(ns, typ+"-"+uuid.NewString())
+		}
 		pods = append(pods, p)
 		stats[p.Name] = &pod.Stats{}
 	}
@@ -125,7 +135,7 @@ func main() {
 	mean, _ := statistics.Mean(timeToReady)
 	p95, _ := statistics.Percentile(timeToReady, 95)
 	p99, _ := statistics.Percentile(timeToReady, 99)
-	fmt.Printf("Created %d pods sequentially, results are in ms:\n", podN)
+	fmt.Printf("Created %d %s pods sequentially, results are in ms:\n", podN, typ)
 	fmt.Printf("min: %.0f, max: %.0f, mean: %.0f, p95: %.0f, p99: %.0f\n", min, max, mean, p95, p99)
 }
 
