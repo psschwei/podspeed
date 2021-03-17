@@ -7,7 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-const queueProxyImage = "gcr.io/knative-releases/knative.dev/serving/cmd/queue@sha256:5481fae4ac4973bffb0d8c455a05f0e6c514cea7976d3add8f24081ab479e0b5"
+const queueProxyImage = "docker.io/markusthoemmes/queue-39be6f1d08a095bd076a71d288d295b6@sha256:17087fd10354edd56fd43ee7ace2a3ac9d79746e273b9dc6d089e4cbbc8c2809"
 
 func Knative(ns, name string) *corev1.Pod {
 	var (
