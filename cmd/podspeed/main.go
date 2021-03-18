@@ -101,6 +101,7 @@ func main() {
 				}
 				if pod.IsConditionTrue(p, corev1.PodReady) && stats.Ready.IsZero() {
 					stats.Ready = now
+					stats.ContainersStarted = pod.LastContainerStartedTime(p)
 					readyCh <- struct{}{}
 				}
 			case watch.Deleted:
@@ -130,9 +131,11 @@ func main() {
 	}
 
 	timeToScheduled := make([]float64, 0, len(stats))
+	timeToStarted := make([]float64, 0, len(stats))
 	timeToReady := make([]float64, 0, len(stats))
 	for _, stat := range stats {
 		timeToScheduled = append(timeToScheduled, float64(stat.TimeToScheduled()/time.Millisecond))
+		timeToStarted = append(timeToStarted, float64(stat.TimeToContainersStarted()/time.Millisecond))
 		timeToReady = append(timeToReady, float64(stat.TimeToReady()/time.Millisecond))
 	}
 
@@ -141,6 +144,7 @@ func main() {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.Debug)
 	fmt.Fprintln(w, "metric\tmin\tmax\tmean\tp95\tp99")
 	printStats(w, "Time to scheduled", timeToScheduled)
+	printStats(w, "Time to started", timeToStarted)
 	printStats(w, "Time to ready", timeToReady)
 	w.Flush()
 }
