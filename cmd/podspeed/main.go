@@ -4,10 +4,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
+	"text/tabwriter"
 	"time"
 
 	"github.com/google/uuid"
@@ -135,8 +137,12 @@ func main() {
 	}
 
 	fmt.Printf("Created %d %s pods sequentially, results are in ms:\n", podN, typ)
-	printStats("time to scheduled:", timeToScheduled)
-	printStats("time to ready:    ", timeToReady)
+	fmt.Println()
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.Debug)
+	fmt.Fprintln(w, "metric\tmin\tmax\tmean\tp95\tp99")
+	printStats(w, "Time to scheduled", timeToScheduled)
+	printStats(w, "Time to ready", timeToReady)
+	w.Flush()
 }
 
 func waitForN(ctx context.Context, ch chan struct{}, n int) error {
@@ -154,11 +160,11 @@ func waitForN(ctx context.Context, ch chan struct{}, n int) error {
 	}
 }
 
-func printStats(label string, data []float64) {
+func printStats(w io.Writer, label string, data []float64) {
 	min, _ := statistics.Min(data)
 	max, _ := statistics.Max(data)
 	mean, _ := statistics.Mean(data)
 	p95, _ := statistics.Percentile(data, 95)
 	p99, _ := statistics.Percentile(data, 99)
-	fmt.Printf("%s min: %.0f, max: %.0f, mean: %.0f, p95: %.0f, p99: %.0f\n", label, min, max, mean, p95, p99)
+	fmt.Fprintf(w, "%s\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\n", label, min, max, mean, p95, p99)
 }
