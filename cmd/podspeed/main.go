@@ -27,12 +27,12 @@ func main() {
 		podN int
 	)
 	flag.StringVar(&ns, "n", "default", "the namespace to create the pods in")
-	flag.StringVar(&typ, "typ", "basic", "the type of pods to create, either 'basic' or 'knative'")
+	flag.StringVar(&typ, "typ", "basic", "the type of pods to create, either 'basic', 'knative-head' or 'knative-v0.21'")
 	flag.IntVar(&podN, "pods", 1, "the amount of pods to create")
 	flag.Parse()
 
-	if typ != "basic" && typ != "knative" {
-		log.Fatal("-typ must be either 'basic' or 'knative'")
+	if typ != "basic" && typ != "knative-head" && typ != "knative-v0.21" {
+		log.Fatal("-typ must be either 'basic', 'knative-head' or 'knative-v0.21'")
 	}
 	if podN < 1 {
 		log.Fatal("-pods must not be smaller than 1")
@@ -64,8 +64,10 @@ func main() {
 
 	for i := 0; i < podN; i++ {
 		var p *corev1.Pod
-		if typ == "knative" {
-			p = pod.Knative(ns, typ+"-"+uuid.NewString())
+		if typ == "knative-head" {
+			p = pod.KnativeHead(ns, typ+"-"+uuid.NewString())
+		} else if typ == "knative-v0.21" {
+			p = pod.Knative021(ns, typ+"-"+uuid.NewString())
 		} else {
 			p = pod.Basic(ns, typ+"-"+uuid.NewString())
 		}
