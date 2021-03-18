@@ -7,7 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-const queueProxyImage = "docker.io/markusthoemmes/queue-39be6f1d08a095bd076a71d288d295b6@sha256:17087fd10354edd56fd43ee7ace2a3ac9d79746e273b9dc6d089e4cbbc8c2809"
+const queueProxyImage = "docker.io/markusthoemmes/queue-39be6f1d08a095bd076a71d288d295b6@sha256:8f3e3ae91b4be6783f10e14b398861240b16ba09cb98d85e86f4b04c7e6be76c"
 
 func Knative(ns, name string) *corev1.Pod {
 	var (
@@ -166,13 +166,28 @@ func Knative(ns, name string) *corev1.Pod {
 						corev1.ResourceCPU: resource.MustParse("25m"),
 					},
 				},
-				ReadinessProbe: &corev1.Probe{
+				StartupProbe: &corev1.Probe{
 					Handler: corev1.Handler{
 						Exec: &corev1.ExecAction{
-							Command: []string{"/ko-app/queue", "-probe-period", "0"},
+							Command: []string{"/ko-app/queue", "-probe-timeout", "10m0s"},
 						},
 					},
-					TimeoutSeconds:   10,
+					TimeoutSeconds:   600,
+					FailureThreshold: 1,
+					SuccessThreshold: 1,
+					PeriodSeconds:    1,
+				},
+				ReadinessProbe: &corev1.Probe{
+					Handler: corev1.Handler{
+						HTTPGet: &corev1.HTTPGetAction{
+							HTTPHeaders: []corev1.HTTPHeader{{
+								Name:  "K-Network-Probe",
+								Value: "queue",
+							}},
+							Port: intstr.FromInt(8012),
+						},
+					},
+					TimeoutSeconds:   1,
 					FailureThreshold: 3,
 					SuccessThreshold: 1,
 					PeriodSeconds:    10,
