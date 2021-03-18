@@ -17,7 +17,7 @@ $ podspeed -h
   -pods int
     	the amount of pods to create (default 1)
   -typ string
-    	the type of pods to create, either 'basic' or 'knative' (default "basic")
+    	the type of pods to create, either 'basic', 'knative-head' or 'knative-v0.21' (default "basic")
 ```
 
 ## "Roadmap"
