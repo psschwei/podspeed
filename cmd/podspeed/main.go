@@ -24,13 +24,15 @@ import (
 
 func main() {
 	var (
-		ns   string
-		typ  string
-		podN int
+		ns         string
+		typ        string
+		podN       int
+		skipDelete bool
 	)
 	flag.StringVar(&ns, "n", "default", "the namespace to create the pods in")
 	flag.StringVar(&typ, "typ", "basic", "the type of pods to create, either 'basic', 'knative-head' or 'knative-v0.21'")
 	flag.IntVar(&podN, "pods", 1, "the amount of pods to create")
+	flag.BoolVar(&skipDelete, "skip-delete", false, "skip removing the pods after they're ready if true")
 	flag.Parse()
 
 	if typ != "basic" && typ != "knative-head" && typ != "knative-v0.21" {
@@ -120,14 +122,16 @@ func main() {
 			log.Fatal("Failed to wait for pod becoming ready", err)
 		}
 
-		var zero int64
-		if err := kube.CoreV1().Pods(p.Namespace).Delete(ctx, p.Name, metav1.DeleteOptions{
-			GracePeriodSeconds: &zero,
-		}); err != nil {
-			log.Fatal("Failed to delete pod", err)
-		}
+		if !skipDelete {
+			var zero int64
+			if err := kube.CoreV1().Pods(p.Namespace).Delete(ctx, p.Name, metav1.DeleteOptions{
+				GracePeriodSeconds: &zero,
+			}); err != nil {
+				log.Fatal("Failed to delete pod", err)
+			}
 
-		waitForN(ctx, deletedCh, 1)
+			waitForN(ctx, deletedCh, 1)
+		}
 	}
 
 	timeToScheduled := make([]float64, 0, len(stats))
