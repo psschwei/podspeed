@@ -144,7 +144,7 @@ func main() {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.Debug)
 	fmt.Fprintln(w, "metric\tmin\tmax\tmean\tp95\tp99")
 	printStats(w, "Time to scheduled", timeToScheduled)
-	printStats(w, "Time to started", timeToStarted)
+	printStats(w, "Time to started (exp)", timeToStarted)
 	printStats(w, "Time to ready", timeToReady)
 	w.Flush()
 }
