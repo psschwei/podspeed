@@ -8,12 +8,14 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"text/tabwriter"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/markusthoemmes/podspeed/pkg/pod"
+	podtypes "github.com/markusthoemmes/podspeed/pkg/pod/types"
 	statistics "github.com/montanaflynn/stats"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,23 +31,19 @@ func main() {
 		podN       int
 		skipDelete bool
 	)
+
+	supportedTypes := strings.Join(podtypes.SupportedConstructors.Names(), ", ")
 	flag.StringVar(&ns, "n", "default", "the namespace to create the pods in")
-	flag.StringVar(&typ, "typ", "basic", "the type of pods to create, either 'basic', 'knative-head' or 'knative-v0.21'")
+	flag.StringVar(&typ, "typ", "basic", "the type of pods to create, supported values: "+supportedTypes)
 	flag.IntVar(&podN, "pods", 1, "the amount of pods to create")
 	flag.BoolVar(&skipDelete, "skip-delete", false, "skip removing the pods after they're ready if true")
 	flag.Parse()
 
-	var podFn func(string, string) *corev1.Pod
-	switch typ {
-	case "basic":
-		podFn = pod.Basic
-	case "knative-head":
-		podFn = pod.KnativeHead
-	case "knative-v0.21":
-		podFn = pod.Knative021
-	default:
-		log.Fatal("-typ must be either 'basic', 'knative-head' or 'knative-v0.21'")
+	podFn := podtypes.SupportedConstructors[typ]
+	if podFn == nil {
+		log.Fatal("valid values for -typ are: ", supportedTypes)
 	}
+
 	if podN < 1 {
 		log.Fatal("-pods must not be smaller than 1")
 	}

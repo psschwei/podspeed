@@ -1,4 +1,4 @@
-package pod
+package types
 
 import (
 	corev1 "k8s.io/api/core/v1"
@@ -6,6 +6,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
+
+func init() {
+	addConstructor("knative-head", KnativeHead)
+	addConstructor("knative-v0.21", Knative021)
+}
 
 const (
 	queueProxyImageHead = "docker.io/markusthoemmes/queue-39be6f1d08a095bd076a71d288d295b6@sha256:8f3e3ae91b4be6783f10e14b398861240b16ba09cb98d85e86f4b04c7e6be76c"
