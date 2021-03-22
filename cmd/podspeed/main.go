@@ -35,7 +35,15 @@ func main() {
 	flag.BoolVar(&skipDelete, "skip-delete", false, "skip removing the pods after they're ready if true")
 	flag.Parse()
 
-	if typ != "basic" && typ != "knative-head" && typ != "knative-v0.21" {
+	var podFn func(string, string) *corev1.Pod
+	switch typ {
+	case "basic":
+		podFn = pod.Basic
+	case "knative-head":
+		podFn = pod.KnativeHead
+	case "knative-v0.21":
+		podFn = pod.Knative021
+	default:
 		log.Fatal("-typ must be either 'basic', 'knative-head' or 'knative-v0.21'")
 	}
 	if podN < 1 {
@@ -67,14 +75,7 @@ func main() {
 	stats := make(map[string]*pod.Stats, podN)
 
 	for i := 0; i < podN; i++ {
-		var p *corev1.Pod
-		if typ == "knative-head" {
-			p = pod.KnativeHead(ns, typ+"-"+uuid.NewString())
-		} else if typ == "knative-v0.21" {
-			p = pod.Knative021(ns, typ+"-"+uuid.NewString())
-		} else {
-			p = pod.Basic(ns, typ+"-"+uuid.NewString())
-		}
+		p := podFn(ns, typ+"-"+uuid.NewString())
 		pods = append(pods, p)
 		stats[p.Name] = &pod.Stats{}
 	}
