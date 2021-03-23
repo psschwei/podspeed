@@ -16,8 +16,12 @@ $ podspeed -h
     	the namespace to create the pods in (default "default")
   -pods int
     	the amount of pods to create (default 1)
+  -prepull
+    	prepull all used images to all Kubernetes nodes
+  -skip-delete
+    	skip removing the pods after they're ready if true
   -typ string
-    	the type of pods to create, either 'basic', 'knative-head' or 'knative-v0.21' (default "basic")
+    	the type of pods to create, supported values: basic, knative-head, knative-v0.21 (default "basic")
 ```
 
 ## "Roadmap"
