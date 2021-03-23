@@ -198,7 +198,7 @@ func KnativeHead(ns, name string) *corev1.Pod {
 					TimeoutSeconds:   1,
 					FailureThreshold: 3,
 					SuccessThreshold: 1,
-					PeriodSeconds:    10,
+					PeriodSeconds:    1,
 				},
 				SecurityContext: &corev1.SecurityContext{
 					AllowPrivilegeEscalation: &fal,
