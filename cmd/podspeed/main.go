@@ -17,10 +17,14 @@ import (
 	"github.com/markusthoemmes/podspeed/pkg/pod"
 	podtypes "github.com/markusthoemmes/podspeed/pkg/pod/types"
 	statistics "github.com/montanaflynn/stats"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
+	clientappsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -30,6 +34,7 @@ func main() {
 		typ        string
 		podN       int
 		skipDelete bool
+		prepull    bool
 	)
 
 	supportedTypes := strings.Join(podtypes.SupportedConstructors.Names(), ", ")
@@ -37,6 +42,7 @@ func main() {
 	flag.StringVar(&typ, "typ", "basic", "the type of pods to create, supported values: "+supportedTypes)
 	flag.IntVar(&podN, "pods", 1, "the amount of pods to create")
 	flag.BoolVar(&skipDelete, "skip-delete", false, "skip removing the pods after they're ready if true")
+	flag.BoolVar(&prepull, "prepull", false, "prepull all used images to all Kubernetes nodes")
 	flag.Parse()
 
 	podFn := podtypes.SupportedConstructors[typ]
@@ -64,7 +70,20 @@ func main() {
 		log.Fatal("Failed to create Kubernetes client", err)
 	}
 
-	watcher, err := kube.CoreV1().Pods(ns).Watch(ctx, metav1.ListOptions{})
+	if prepull {
+		log.Println("Prepulling images to all nodes")
+		if err := prepullImages(ctx, kube.AppsV1().DaemonSets(ns), podFn(ns, "").Spec); err != nil {
+			log.Fatal("Failed to prepull images", err)
+		}
+		log.Println("Prepulling done")
+	}
+
+	runLabels := labels.Set{
+		"podspeed/run": uuid.NewString(),
+	}
+	watcher, err := kube.CoreV1().Pods(ns).Watch(ctx, metav1.ListOptions{
+		LabelSelector: runLabels.String(),
+	})
 	if err != nil {
 		log.Fatal("Failed to setup watch for pods", err)
 	}
@@ -74,6 +93,7 @@ func main() {
 
 	for i := 0; i < podN; i++ {
 		p := podFn(ns, typ+"-"+uuid.NewString())
+		p.Labels = runLabels
 		pods = append(pods, p)
 		stats[p.Name] = &pod.Stats{}
 	}
@@ -171,4 +191,42 @@ func printStats(w io.Writer, label string, data []float64) {
 	p95, _ := statistics.Percentile(data, 95)
 	p99, _ := statistics.Percentile(data, 99)
 	fmt.Fprintf(w, "%s\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\n", label, min, max, mean, p95, p99)
+}
+
+func prepullImages(ctx context.Context, client clientappsv1.DaemonSetInterface, podSpec corev1.PodSpec) error {
+	labels := map[string]string{
+		"podspeed/warmup": "true",
+	}
+	ds := &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "warmup",
+		},
+		Spec: appsv1.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+				Spec: podSpec,
+			},
+		},
+	}
+
+	if _, err := client.Create(ctx, ds, metav1.CreateOptions{}); err != nil {
+		return fmt.Errorf("failed to create DaemonSet: %w", err)
+	}
+
+	if err := wait.PollImmediate(1*time.Second, 3*time.Minute, func() (bool, error) {
+		got, err := client.Get(ctx, ds.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, fmt.Errorf("failed to fetch DaemonSet: %w", err)
+		}
+		return got.Status.NumberReady > 0 && got.Status.NumberReady == got.Status.DesiredNumberScheduled, nil
+	}); err != nil {
+		return fmt.Errorf("DaemonSet never became ready: %w", err)
+	}
+
+	return client.Delete(ctx, ds.Name, metav1.DeleteOptions{})
 }
