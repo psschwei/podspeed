@@ -47,11 +47,11 @@ func main() {
 
 	podFn := podtypes.SupportedConstructors[typ]
 	if podFn == nil {
-		log.Fatal("valid values for -typ are: ", supportedTypes)
+		log.Fatalln("valid values for -typ are: ", supportedTypes)
 	}
 
 	if podN < 1 {
-		log.Fatal("-pods must not be smaller than 1")
+		log.Fatalln("-pods must not be smaller than 1")
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -61,19 +61,19 @@ func main() {
 	config, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		clientcmd.NewDefaultClientConfigLoadingRules(), nil).ClientConfig()
 	if err != nil {
-		log.Fatal("Failed to load config", err)
+		log.Fatalln("Failed to load config", err)
 	}
 
 	// Create kubernetes client.
 	kube, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		log.Fatal("Failed to create Kubernetes client", err)
+		log.Fatalln("Failed to create Kubernetes client", err)
 	}
 
 	if prepull {
 		log.Println("Prepulling images to all nodes")
 		if err := prepullImages(ctx, kube.AppsV1().DaemonSets(ns), podFn(ns, "").Spec); err != nil {
-			log.Fatal("Failed to prepull images", err)
+			log.Fatalln("Failed to prepull images", err)
 		}
 		log.Println("Prepulling done")
 	}
@@ -85,7 +85,7 @@ func main() {
 		LabelSelector: runLabels.String(),
 	})
 	if err != nil {
-		log.Fatal("Failed to setup watch for pods", err)
+		log.Fatalln("Failed to setup watch for pods", err)
 	}
 
 	pods := make([]*corev1.Pod, 0, podN)
@@ -133,12 +133,12 @@ func main() {
 
 	for _, p := range pods {
 		if _, err := kube.CoreV1().Pods(p.Namespace).Create(ctx, p, metav1.CreateOptions{}); err != nil {
-			log.Fatal("Failed to create pod", err)
+			log.Fatalln("Failed to create pod", err)
 		}
 
 		// Wait for all pods to become ready.
 		if err := waitForN(ctx, readyCh, 1); err != nil {
-			log.Fatal("Failed to wait for pod becoming ready", err)
+			log.Fatalln("Failed to wait for pod becoming ready", err)
 		}
 
 		if !skipDelete {
@@ -146,7 +146,7 @@ func main() {
 			if err := kube.CoreV1().Pods(p.Namespace).Delete(ctx, p.Name, metav1.DeleteOptions{
 				GracePeriodSeconds: &zero,
 			}); err != nil {
-				log.Fatal("Failed to delete pod", err)
+				log.Fatalln("Failed to delete pod", err)
 			}
 
 			waitForN(ctx, deletedCh, 1)
