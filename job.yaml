@@ -41,5 +41,5 @@ spec:
       containers:
       - name: podspeed
         image: ko://github.com/markusthoemmes/podspeed/cmd/podspeed
-        command: ["/ko-app/podspeed",  "-pods", "1", "-typ", "basic"]
+        command: ["/ko-app/podspeed",  "-pods", "20", "-typ", "knative-head", "-probe"]
       restartPolicy: Never

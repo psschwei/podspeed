@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -21,6 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
@@ -35,6 +37,7 @@ func main() {
 		podN       int
 		skipDelete bool
 		prepull    bool
+		probe      bool
 	)
 
 	supportedTypes := strings.Join(podtypes.SupportedConstructors.Names(), ", ")
@@ -43,6 +46,7 @@ func main() {
 	flag.IntVar(&podN, "pods", 1, "the amount of pods to create")
 	flag.BoolVar(&skipDelete, "skip-delete", false, "skip removing the pods after they're ready if true")
 	flag.BoolVar(&prepull, "prepull", false, "prepull all used images to all Kubernetes nodes")
+	flag.BoolVar(&probe, "probe", false, "probe the pods as soon as they have an IP address and capture latency of that as well")
 	flag.Parse()
 
 	podFn := podtypes.SupportedConstructors[typ]
@@ -100,7 +104,11 @@ func main() {
 
 	readyCh := make(chan struct{}, podN)
 	deletedCh := make(chan struct{}, podN)
+	ipCh := make(chan *corev1.Pod, podN)
+	probedCh := make(chan struct{}, podN)
 	go func() {
+		seenIP := sets.NewString()
+
 		for event := range watcher.ResultChan() {
 			now := time.Now()
 			switch event.Type {
@@ -108,9 +116,17 @@ func main() {
 				p := event.Object.(*corev1.Pod)
 				stats := stats[p.Name]
 				stats.Created = now
+				if p.Status.PodIP != "" && !seenIP.Has(p.Name) {
+					seenIP.Insert(p.Name)
+					ipCh <- p
+				}
 			case watch.Modified:
 				p := event.Object.(*corev1.Pod)
 				stats := stats[p.Name]
+				if p.Status.PodIP != "" && !seenIP.Has(p.Name) {
+					seenIP.Insert(p.Name)
+					ipCh <- p
+				}
 				if pod.IsConditionTrue(p, corev1.PodScheduled) && stats.Scheduled.IsZero() {
 					stats.Scheduled = now
 				}
@@ -131,6 +147,25 @@ func main() {
 		}
 	}()
 
+	if probe {
+		go func() {
+			for p := range ipCh {
+				// TODO: Probe path needs to be adjustable per app.
+				url := "http://" + p.Status.PodIP + ":8012"
+				wait.PollImmediateInfinite(10*time.Millisecond, func() (bool, error) {
+					resp, err := http.Get(url)
+					if err != nil {
+						return false, nil
+					}
+					defer resp.Body.Close()
+					return resp.StatusCode == http.StatusOK, nil
+				})
+				stats[p.Name].Probed = time.Now()
+				probedCh <- struct{}{}
+			}
+		}()
+	}
+
 	for _, p := range pods {
 		if _, err := kube.CoreV1().Pods(p.Namespace).Create(ctx, p, metav1.CreateOptions{}); err != nil {
 			log.Fatalln("Failed to create pod", err)
@@ -139,6 +174,12 @@ func main() {
 		// Wait for all pods to become ready.
 		if err := waitForN(ctx, readyCh, 1); err != nil {
 			log.Fatalln("Failed to wait for pod becoming ready", err)
+		}
+		if probe {
+			// And for all pods to be probed, if we're doing that.
+			if err := waitForN(ctx, probedCh, 1); err != nil {
+				log.Fatal("Failed to wait for pod be probed", err)
+			}
 		}
 
 		if !skipDelete {
@@ -154,9 +195,11 @@ func main() {
 	}
 
 	timeToScheduled := make([]float64, 0, len(stats))
+	timeToProbed := make([]float64, 0, len(stats))
 	timeToReady := make([]float64, 0, len(stats))
 	for _, stat := range stats {
 		timeToScheduled = append(timeToScheduled, float64(stat.TimeToScheduled()/time.Millisecond))
+		timeToProbed = append(timeToProbed, float64(stat.TimeToProbed()/time.Millisecond))
 		timeToReady = append(timeToReady, float64(stat.TimeToReady()/time.Millisecond))
 	}
 
@@ -165,6 +208,9 @@ func main() {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.Debug)
 	fmt.Fprintln(w, "metric\tmin\tmax\tmean\tp95\tp99")
 	printStats(w, "Time to scheduled", timeToScheduled)
+	if probe {
+		printStats(w, "Time to probed", timeToProbed)
+	}
 	printStats(w, "Time to ready", timeToReady)
 	w.Flush()
 }
