@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: podspeed
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: podspeed
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "create", "update", "delete", "patch", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["daemonsets"]
+    verbs: ["get", "list", "create", "update", "delete", "patch", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: podspeed
+  labels:
+    serving.knative.dev/release: devel
+subjects:
+  - kind: ServiceAccount
+    name: podspeed
+    namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: podspeed
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: podspeed
+spec:
+  template:
+    spec:
+      serviceAccountName: podspeed
+      containers:
+      - name: podspeed
+        image: ko://github.com/markusthoemmes/podspeed/cmd/podspeed
+        command: ["/ko-app/podspeed",  "-pods", "1", "-typ", "basic"]
+      restartPolicy: Never
