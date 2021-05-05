@@ -9,7 +9,9 @@ type Stats struct {
 	ContainersStarted time.Time
 	ContainersReady   time.Time
 	Ready             time.Time
-	Probed            time.Time
+
+	HasIP  time.Time
+	Probed time.Time
 }
 
 func (s Stats) TimeToScheduled() time.Duration {
@@ -26,6 +28,10 @@ func (s Stats) TimeToContainersStarted() time.Duration {
 
 func (s Stats) TimeToReady() time.Duration {
 	return s.Ready.Sub(s.Created)
+}
+
+func (s Stats) TimeToIP() time.Duration {
+	return s.HasIP.Sub(s.Created)
 }
 
 func (s Stats) TimeToProbed() time.Duration {

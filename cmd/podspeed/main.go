@@ -22,7 +22,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
@@ -107,8 +106,6 @@ func main() {
 	ipCh := make(chan *corev1.Pod, podN)
 	probedCh := make(chan struct{}, podN)
 	go func() {
-		seenIP := sets.NewString()
-
 		for event := range watcher.ResultChan() {
 			now := time.Now()
 			switch event.Type {
@@ -116,15 +113,16 @@ func main() {
 				p := event.Object.(*corev1.Pod)
 				stats := stats[p.Name]
 				stats.Created = now
-				if p.Status.PodIP != "" && !seenIP.Has(p.Name) {
-					seenIP.Insert(p.Name)
+				if p.Status.PodIP != "" && stats.HasIP.IsZero() {
+					stats.HasIP = now
 					ipCh <- p
 				}
 			case watch.Modified:
 				p := event.Object.(*corev1.Pod)
 				stats := stats[p.Name]
-				if p.Status.PodIP != "" && !seenIP.Has(p.Name) {
-					seenIP.Insert(p.Name)
+
+				if p.Status.PodIP != "" && stats.HasIP.IsZero() {
+					stats.HasIP = now
 					ipCh <- p
 				}
 				if pod.IsConditionTrue(p, corev1.PodScheduled) && stats.Scheduled.IsZero() {
@@ -195,10 +193,12 @@ func main() {
 	}
 
 	timeToScheduled := make([]float64, 0, len(stats))
+	timeToIP := make([]float64, 0, len(stats))
 	timeToProbed := make([]float64, 0, len(stats))
 	timeToReady := make([]float64, 0, len(stats))
 	for _, stat := range stats {
 		timeToScheduled = append(timeToScheduled, float64(stat.TimeToScheduled()/time.Millisecond))
+		timeToIP = append(timeToIP, float64(stat.TimeToIP()/time.Millisecond))
 		timeToProbed = append(timeToProbed, float64(stat.TimeToProbed()/time.Millisecond))
 		timeToReady = append(timeToReady, float64(stat.TimeToReady()/time.Millisecond))
 	}
@@ -208,6 +208,7 @@ func main() {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.Debug)
 	fmt.Fprintln(w, "metric\tmin\tmax\tmean\tp95\tp99")
 	printStats(w, "Time to scheduled", timeToScheduled)
+	printStats(w, "Time to ip", timeToIP)
 	if probe {
 		printStats(w, "Time to probed", timeToProbed)
 	}
