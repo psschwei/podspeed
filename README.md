@@ -12,16 +12,20 @@ across different use-cases and clusters.
 
 ```
 $ podspeed -h
+  -details
+    	print detailed timing information for each pod
   -n string
     	the namespace to create the pods in (default "default")
   -pods int
     	the amount of pods to create (default 1)
   -prepull
     	prepull all used images to all Kubernetes nodes
+  -probe
+    	probe the pods as soon as they have an IP address and capture latency of that as well
   -skip-delete
     	skip removing the pods after they're ready if true
   -typ string
-    	the type of pods to create, supported values: basic, knative-head, knative-v0.21 (default "basic")
+    	the type of pods to create, supported values: basic, knative-head, knative-qpframework, knative-v0.21 (default "basic")
 ```
 
 ## "Roadmap"
