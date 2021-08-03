@@ -37,6 +37,7 @@ func main() {
 		skipDelete bool
 		prepull    bool
 		probe      bool
+		details    bool
 	)
 
 	supportedTypes := strings.Join(podtypes.SupportedConstructors.Names(), ", ")
@@ -46,6 +47,7 @@ func main() {
 	flag.BoolVar(&skipDelete, "skip-delete", false, "skip removing the pods after they're ready if true")
 	flag.BoolVar(&prepull, "prepull", false, "prepull all used images to all Kubernetes nodes")
 	flag.BoolVar(&probe, "probe", false, "probe the pods as soon as they have an IP address and capture latency of that as well")
+	flag.BoolVar(&details, "details", false, "print detailed timing information for each pod")
 	flag.Parse()
 
 	podFn := podtypes.SupportedConstructors[typ]
@@ -214,6 +216,20 @@ func main() {
 	}
 	printStats(w, "Time to ready", timeToReady)
 	w.Flush()
+
+	if details {
+		fmt.Println()
+		fmt.Println("Details:")
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.Debug)
+		fmt.Fprintln(w, "pod\tto scheduled\tto ip\tto ready")
+		for name, stat := range stats {
+			fmt.Fprintf(w, "%s\t%d\t%d\t%d\n", name,
+				stat.TimeToScheduled()/time.Millisecond,
+				stat.TimeToIP()/time.Millisecond,
+				stat.TimeToReady()/time.Millisecond)
+		}
+		w.Flush()
+	}
 }
 
 func waitForN(ctx context.Context, ch chan struct{}, n int) error {
