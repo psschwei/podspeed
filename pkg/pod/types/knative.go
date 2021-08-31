@@ -12,7 +12,7 @@ func init() {
 }
 
 const (
-	queueProxyImageHead = "docker.io/markusthoemmes/queue-39be6f1d08a095bd076a71d288d295b6@sha256:8f3e3ae91b4be6783f10e14b398861240b16ba09cb98d85e86f4b04c7e6be76c"
+	queueProxyImageHead = "docker.io/markusthoemmes/queue-39be6f1d08a095bd076a71d288d295b6@sha256:dcd7ff146c30bd087b3b7d4dbeea1de148ce39e7542a8f56cc99c127c5c9baaf"
 )
 
 func KnativeHead(ns, name string) *corev1.Pod {
@@ -124,9 +124,6 @@ func KnativeHead(ns, name string) *corev1.Pod {
 					Name:  "TRACING_CONFIG_ZIPKIN_ENDPOINT",
 					Value: "",
 				}, {
-					Name:  "TRACING_CONFIG_STACKDRIVER_PROJECT_ID",
-					Value: "",
-				}, {
 					Name:  "TRACING_CONFIG_DEBUG",
 					Value: "false",
 				}, {
@@ -153,6 +150,12 @@ func KnativeHead(ns, name string) *corev1.Pod {
 				}, {
 					Name:  "METRICS_COLLECTOR_ADDRESS",
 					Value: "",
+				}, {
+					Name:  "CONCURRENCY_STATE_ENDPOINT",
+					Value: "",
+				}, {
+					Name:  "ENABLE_HTTP2_AUTO_DETECTION",
+					Value: "false",
 				}},
 				Ports: []corev1.ContainerPort{{
 					Name:          "http-queueadm",
