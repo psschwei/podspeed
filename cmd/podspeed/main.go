@@ -45,7 +45,7 @@ func main() {
 	supportedTypes := strings.Join(podtypes.SupportedConstructors.Names(), ", ")
 	flag.StringVar(&ns, "n", "default", "the namespace to create the pods in")
 	flag.StringVar(&typ, "typ", "basic", "the type of pods to create, supported values: "+supportedTypes)
-	flag.StringVar(&template, "template", "", "a YAML template to create pods from, can be exported from Kubernetes directly via 'kubectl get pods -oyaml'")
+	flag.StringVar(&template, "template", "", "a YAML template to create pods from, can be exported from Kubernetes directly via 'kubectl get pods -oyaml', reads stdin if '-'")
 	flag.IntVar(&podN, "pods", 1, "the amount of pods to create")
 	flag.BoolVar(&skipDelete, "skip-delete", false, "skip removing the pods after they're ready if true")
 	flag.BoolVar(&prepull, "prepull", false, "prepull all used images to all Kubernetes nodes")
@@ -59,7 +59,17 @@ func main() {
 	}
 
 	if template != "" {
-		fn, err := podtemplate.PodConstructorFromYAMLFile(template)
+		var content io.Reader
+		if template == "-" {
+			content = os.Stdin
+		} else {
+			file, err := os.Open(template)
+			if err != nil {
+				log.Fatalln("Failed to open template file", err)
+			}
+			content = file
+		}
+		fn, err := podtemplate.PodConstructorFromYAML(content)
 		if err != nil {
 			log.Fatalln("Failed to generate template from file", err)
 		}
