@@ -1,6 +1,7 @@
 package template
 
 import (
+	"fmt"
 	"io"
 
 	corev1 "k8s.io/api/core/v1"
@@ -12,7 +13,9 @@ func PodConstructorFromYAML(content io.Reader) (func(string, string) *corev1.Pod
 	pod := &corev1.Pod{}
 
 	decoder := yaml.NewYAMLToJSONDecoder(content)
-	decoder.Decode(pod)
+	if err := decoder.Decode(pod); err != nil {
+		return nil, fmt.Errorf("failed to decode YAML content: %w", err)
+	}
 
 	return func(ns, name string) *corev1.Pod {
 		// Reset metadata
