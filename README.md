@@ -25,7 +25,7 @@ $ podspeed -h
   -skip-delete
     	skip removing the pods after they're ready if true
   -typ string
-    	the type of pods to create, supported values: basic, basic-no-volume, knative-head, knative-qpframework, knative-v0.21 (default "basic")
+    	the type of pods to create, supported values: basic, basic-no-volume, knative-head, knative-qpframework (default "basic")
 ```
 
 ## "Roadmap"
