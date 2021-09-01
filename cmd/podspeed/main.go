@@ -16,6 +16,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/markusthoemmes/podspeed/pkg/pod"
+	podtemplate "github.com/markusthoemmes/podspeed/pkg/pod/template"
 	podtypes "github.com/markusthoemmes/podspeed/pkg/pod/types"
 	statistics "github.com/montanaflynn/stats"
 	appsv1 "k8s.io/api/apps/v1"
@@ -33,6 +34,7 @@ func main() {
 	var (
 		ns         string
 		typ        string
+		template   string
 		podN       int
 		skipDelete bool
 		prepull    bool
@@ -43,6 +45,7 @@ func main() {
 	supportedTypes := strings.Join(podtypes.SupportedConstructors.Names(), ", ")
 	flag.StringVar(&ns, "n", "default", "the namespace to create the pods in")
 	flag.StringVar(&typ, "typ", "basic", "the type of pods to create, supported values: "+supportedTypes)
+	flag.StringVar(&template, "template", "", "a YAML template to create pods from, can be exported from Kubernetes directly via 'kubectl get pods -oyaml'")
 	flag.IntVar(&podN, "pods", 1, "the amount of pods to create")
 	flag.BoolVar(&skipDelete, "skip-delete", false, "skip removing the pods after they're ready if true")
 	flag.BoolVar(&prepull, "prepull", false, "prepull all used images to all Kubernetes nodes")
@@ -53,6 +56,14 @@ func main() {
 	podFn := podtypes.SupportedConstructors[typ]
 	if podFn == nil {
 		log.Fatalln("valid values for -typ are: ", supportedTypes)
+	}
+
+	if template != "" {
+		fn, err := podtemplate.PodConstructorFromYAMLFile(template)
+		if err != nil {
+			log.Fatalln("Failed to generate template from file", err)
+		}
+		podFn = fn
 	}
 
 	if podN < 1 {

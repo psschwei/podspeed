@@ -24,6 +24,8 @@ $ podspeed -h
     	probe the pods as soon as they have an IP address and capture latency of that as well
   -skip-delete
     	skip removing the pods after they're ready if true
+  -template string
+    	a YAML template to create pods from, can be exported from Kubernetes directly via 'kubectl get pods -oyaml'
   -typ string
     	the type of pods to create, supported values: basic, basic-no-volume, knative-head, knative-qpframework (default "basic")
 ```
