@@ -27,7 +27,7 @@ $ podspeed -h
   -template string
     	a YAML template to create pods from, can be exported from Kubernetes directly via 'kubectl get pods -oyaml', reads stdin if '-'
   -typ string
-    	the type of pods to create, supported values: basic, basic-no-volume, knative-head, knative-qpframework (default "basic")
+    	the type of pods to create, supported values: basic, basic-no-volume, knative-head (default "basic")
 ```
 
 ## "Roadmap"
