@@ -1,28 +1,50 @@
 package types
 
 import (
+	"embed"
+	"fmt"
+	"path/filepath"
 	"sort"
+	"strings"
 
+	"github.com/markusthoemmes/podspeed/pkg/pod/template"
 	corev1 "k8s.io/api/core/v1"
 )
 
-type PodConstructor func(string, string) *corev1.Pod
-type Constructors map[string]PodConstructor
+//go:embed manifests
+var fs embed.FS
 
-var SupportedConstructors Constructors
+const folder = "manifests"
 
-func (c Constructors) Names() []string {
-	names := make([]string, 0, len(c))
-	for name := range c {
-		names = append(names, name)
+func Names() ([]string, error) {
+	files, err := fs.ReadDir(folder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read built in types: %w", err)
+	}
+
+	names := make([]string, 0, len(files))
+	for _, file := range files {
+		if !file.IsDir() {
+			names = append(names, fileNameWithoutExtension(file.Name()))
+		}
 	}
 	sort.Strings(names)
-	return names
+	return names, nil
 }
 
-func addConstructor(name string, fn func(string, string) *corev1.Pod) {
-	if SupportedConstructors == nil {
-		SupportedConstructors = make(Constructors, 1)
+func GetConstructor(name string) (func(string, string) *corev1.Pod, error) {
+	file, err := fs.Open(filepath.Join(folder, name+".yaml"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to open built in template: %w", err)
 	}
-	SupportedConstructors[name] = fn
+	defer file.Close()
+
+	return template.PodConstructorFromYAML(file)
+}
+
+func fileNameWithoutExtension(fileName string) string {
+	if pos := strings.LastIndexByte(fileName, '.'); pos != -1 {
+		return fileName[:pos]
+	}
+	return fileName
 }

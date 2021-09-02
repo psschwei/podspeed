@@ -42,9 +42,13 @@ func main() {
 		details    bool
 	)
 
-	supportedTypes := strings.Join(podtypes.SupportedConstructors.Names(), ", ")
+	supportedTypes, err := podtypes.Names()
+	if err != nil {
+		log.Fatalln("failed to built in types: ", err)
+	}
+
 	flag.StringVar(&ns, "n", "default", "the namespace to create the pods in")
-	flag.StringVar(&typ, "typ", "basic", "the type of pods to create, supported values: "+supportedTypes)
+	flag.StringVar(&typ, "typ", "basic", "the type of pods to create, supported values: "+strings.Join(supportedTypes, ", "))
 	flag.StringVar(&template, "template", "", "a YAML template to create pods from, can be exported from Kubernetes directly via 'kubectl get pods -oyaml', reads stdin if '-'")
 	flag.IntVar(&podN, "pods", 1, "the amount of pods to create")
 	flag.BoolVar(&skipDelete, "skip-delete", false, "skip removing the pods after they're ready if true")
@@ -53,9 +57,9 @@ func main() {
 	flag.BoolVar(&details, "details", false, "print detailed timing information for each pod")
 	flag.Parse()
 
-	podFn := podtypes.SupportedConstructors[typ]
-	if podFn == nil {
-		log.Fatalln("valid values for -typ are: ", supportedTypes)
+	podFn, err := podtypes.GetConstructor(typ)
+	if err != nil {
+		log.Fatalln("failed to load constructor, valid values for -typ are: ", supportedTypes, err)
 	}
 
 	if template != "" {
