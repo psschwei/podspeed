@@ -30,7 +30,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	// Allow podspeed to run against a GCP cluster
-	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
 func main() {
