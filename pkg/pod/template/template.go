@@ -12,7 +12,7 @@ import (
 func PodConstructorFromYAML(content io.Reader) (func(string, string) *corev1.Pod, error) {
 	pod := &corev1.Pod{}
 
-	decoder := yaml.NewYAMLToJSONDecoder(content)
+	decoder := yaml.NewYAMLOrJSONDecoder(content, 64)
 	if err := decoder.Decode(pod); err != nil {
 		return nil, fmt.Errorf("failed to decode YAML content: %w", err)
 	}
