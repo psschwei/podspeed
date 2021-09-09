@@ -236,7 +236,7 @@ func main() {
 	fmt.Printf("Created %d %s pods sequentially, results are in ms:\n", podN, typ)
 	fmt.Println()
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.Debug)
-	fmt.Fprintln(w, "metric\tmin\tmax\tmean\tp95\tp99")
+	fmt.Fprintln(w, "metric\tmin\tmax\tmean\tmedian\tp25\tp75\tp95\tp99")
 	printStats(w, "Time to scheduled", timeToScheduled)
 	printStats(w, "Time to ip", timeToIP)
 	if probe {
@@ -279,9 +279,12 @@ func printStats(w io.Writer, label string, data []float64) {
 	min, _ := statistics.Min(data)
 	max, _ := statistics.Max(data)
 	mean, _ := statistics.Mean(data)
+	median, _ := statistics.Median(data)
+	p25, _ := statistics.Percentile(data, 25)
+	p75, _ := statistics.Percentile(data, 75)
 	p95, _ := statistics.Percentile(data, 95)
 	p99, _ := statistics.Percentile(data, 99)
-	fmt.Fprintf(w, "%s\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\n", label, min, max, mean, p95, p99)
+	fmt.Fprintf(w, "%s\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\n", label, min, max, mean, median, p25, p75, p95, p99)
 }
 
 func prepullImages(ctx context.Context, client clientappsv1.DaemonSetInterface, podSpec corev1.PodSpec) error {
