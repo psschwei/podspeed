@@ -67,7 +67,6 @@ func Run(ns string, podObj *corev1.Pod, typ, template string, podN int, skipDele
 
 	// skip if podObj is empty
 	if !reflect.DeepEqual(podObj, &corev1.Pod{}) {
-		fmt.Println("setting podFn for pobObj")
 		fn, err := podtemplate.PodConstructorFromObject(podObj)
 		if err != nil {
 			log.Fatalln("Failed to generate pod object from file", err)
