@@ -5,8 +5,8 @@ import (
 	"log"
 	"strings"
 
-	podtypes "github.com/markusthoemmes/podspeed/pkg/pod/types"
-	"github.com/markusthoemmes/podspeed/pkg/podspeed"
+	podtypes "github.com/psschwei/podspeed-fork/pkg/pod/types"
+	"github.com/psschwei/podspeed-fork/pkg/podspeed"
 )
 
 func main() {
