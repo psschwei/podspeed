@@ -1,4 +1,4 @@
-module github.com/markusthoemmes/podspeed
+module github.com/psschwei/podspeed
 
 go 1.16
 

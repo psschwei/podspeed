@@ -13,10 +13,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/markusthoemmes/podspeed/pkg/pod"
-	podtemplate "github.com/markusthoemmes/podspeed/pkg/pod/template"
-	podtypes "github.com/markusthoemmes/podspeed/pkg/pod/types"
 	statistics "github.com/montanaflynn/stats"
+	"github.com/psschwei/podspeed/pkg/pod"
+	podtemplate "github.com/psschwei/podspeed/pkg/pod/template"
+	podtypes "github.com/psschwei/podspeed/pkg/pod/types"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

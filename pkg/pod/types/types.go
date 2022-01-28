@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/markusthoemmes/podspeed/pkg/pod/template"
+	"github.com/psschwei/podspeed/pkg/pod/template"
 	corev1 "k8s.io/api/core/v1"
 )
 

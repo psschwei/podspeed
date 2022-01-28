@@ -6,4 +6,4 @@ spec:
   template:
     spec:
       containers:
-        - image: ko://github.com/markusthoemmes/podspeed/applications/basic
+        - image: ko://github.com/psschwei/podspeed/applications/basic
