@@ -7,6 +7,7 @@ import (
 
 	podtypes "github.com/psschwei/podspeed/pkg/pod/types"
 	"github.com/psschwei/podspeed/pkg/podspeed"
+	corev1 "k8s.io/api/core/v1"
 )
 
 func main() {
@@ -37,5 +38,8 @@ func main() {
 	flag.BoolVar(&details, "details", false, "print detailed timing information for each pod")
 	flag.Parse()
 
-	podspeed.Run(ns, typ, template, podN, skipDelete, prepull, probe, details)
+	// won't be passed from CLI
+	podObj := &corev1.Pod{}
+
+	podspeed.Run(ns, podObj, typ, template, podN, skipDelete, prepull, probe, details)
 }

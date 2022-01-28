@@ -32,3 +32,20 @@ func PodConstructorFromYAML(content io.Reader) (func(string, string) *corev1.Pod
 		return pod
 	}, nil
 }
+
+func PodConstructorFromObject(pod *corev1.Pod) (func(string, string) *corev1.Pod, error) {
+	return func(ns, name string) *corev1.Pod {
+		pod = pod.DeepCopy()
+
+		// Reset metadata
+		pod.ObjectMeta = metav1.ObjectMeta{
+			Namespace: ns,
+			Name:      name,
+		}
+
+		// Reset Status
+		pod.Status = corev1.PodStatus{}
+
+		return pod
+	}, nil
+}

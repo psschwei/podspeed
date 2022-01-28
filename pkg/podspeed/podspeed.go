@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"reflect"
 	"syscall"
 	"text/tabwriter"
 	"time"
@@ -31,11 +32,14 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
-func Run(ns, typ, template string, podN int, skipDelete, prepull, probe, details bool) {
-
+func Run(ns string, podObj *corev1.Pod, typ, template string, podN int, skipDelete, prepull, probe, details bool) {
 	supportedTypes, err := podtypes.Names()
 	if err != nil {
 		log.Fatalln("failed to built in types: ", err)
+	}
+
+	if typ == "" {
+		typ = "basic"
 	}
 
 	podFn, err := podtypes.GetConstructor(typ)
@@ -57,6 +61,16 @@ func Run(ns, typ, template string, podN int, skipDelete, prepull, probe, details
 		fn, err := podtemplate.PodConstructorFromYAML(content)
 		if err != nil {
 			log.Fatalln("Failed to generate template from file", err)
+		}
+		podFn = fn
+	}
+
+	// skip if podObj is empty
+	if !reflect.DeepEqual(podObj, &corev1.Pod{}) {
+		fmt.Println("setting podFn for pobObj")
+		fn, err := podtemplate.PodConstructorFromObject(podObj)
+		if err != nil {
+			log.Fatalln("Failed to generate pod object from file", err)
 		}
 		podFn = fn
 	}
